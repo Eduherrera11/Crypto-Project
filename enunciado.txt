@@ -1,0 +1,58 @@
+Descripción del Proyecto:
+El objetivo de esta tarea es desarrollar un programa en Python que se conecte a una base de datos MySQL y proporcione una experiencia 
+interactiva en la terminal para gestionar inversiones en criptomonedas. El programa permitirá al usuario realizar varias operaciones 
+relacionadas con sus inversiones y mostrará información relevante de manera clara y organizada.
+
+Funcionalidades Requeridas:
+Conexión a la Base de Datos MySQL:
+
+Establecer una conexión con una base de datos MySQL.
+Asegurar que la base de datos contenga las tablas necesarias para almacenar la información de las inversiones del usuario 
+(fecha de inversión, precio de compra, cantidad comprada, tipo de criptomoneda, etc.).
+Interfaz de Usuario en la Terminal:
+
+Crear un menú interactivo en la terminal que ofrezca varias opciones al usuario.
+Opciones del menú:
+Agregar una nueva inversión en criptomonedas.
+Mostrar el precio actual de una criptomoneda específica.
+Mostrar la cantidad total invertida por el usuario en cada criptomoneda.
+Listar todas las criptomonedas compradas por el usuario con sus respectivos detalles (fecha, precio, cantidad).
+Calcular y mostrar cuánto dinero tendría el usuario si vendiera sus criptomonedas a un precio especificado.
+Mostrar el rendimiento de las inversiones del usuario tanto con el precio actual como con un precio especificado,
+ expresado en porcentaje.
+Agregar Inversiones:
+
+Solicitar al usuario la fecha de la inversión, el precio de compra, la cantidad y el tipo de criptomoneda.
+Guardar esta información en la base de datos.
+Mostrar Precio Actual de Criptomonedas:
+
+Obtener el precio actual de una criptomoneda específica utilizando una API externa de precios de criptomonedas (por ejemplo, 
+CoinGecko o CoinMarketCap).
+Mostrar el precio actual en la terminal.
+Calcular y Mostrar Inversiones:
+
+Consultar la base de datos para obtener la cantidad total invertida por el usuario en cada criptomoneda.
+Listar todas las inversiones del usuario con detalles de fecha, precio y cantidad.
+Calcular Valor Actual y Rendimiento:
+
+Calcular el valor actual de las inversiones del usuario utilizando el precio actual de las criptomonedas.
+Calcular cuánto dinero tendría el usuario si vendiera todas sus criptomonedas a un precio especificado por él.
+Mostrar el rendimiento de las inversiones del usuario en porcentaje, comparando el precio de compra con el precio actual o el precio
+especificado.
+Entregables:
+Código fuente del programa en Python.
+Scripts SQL para la creación de las tablas necesarias en la base de datos MySQL.
+Documentación del código y una guía de usuario para la instalación y uso del programa.
+Criterios de Evaluación:
+Correctitud y eficiencia del código.
+Claridad y usabilidad de la interfaz de usuario en la terminal.
+Correcta implementación de las funcionalidades requeridas.
+Calidad de la documentación proporcionada.
+Manejo adecuado de errores y excepciones.
+Recursos Recomendados:
+Biblioteca mysql-connector-python para la conexión con MySQL.
+Bibliotecas como requests para obtener precios actuales de criptomonedas mediante API.
+Conocimientos de SQL para gestionar la base de datos.
+Manejo de fechas y tiempos en Python con datetime.
+Esta tarea tiene como objetivo poner en práctica tus habilidades de programación en Python, manejo de bases de datos, y desarrollo de 
+interfaces de usuario en la terminal, así como tu capacidad para integrar datos externos mediante APIs.
