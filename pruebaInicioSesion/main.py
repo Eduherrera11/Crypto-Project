@@ -18,6 +18,13 @@ def generar_token():
 def cifrar_contraseña(contraseña):
     return bcrypt.hashpw(contraseña.encode('utf-8'), bcrypt.gensalt())
 
+def usuario_existe(correo):
+    cursor = conexion.cursor()
+    query = "SELECT id FROM usuarios WHERE correo = %s"
+    cursor.execute(query, (correo,))
+    resultado = cursor.fetchone()
+    return resultado is not None
+
 def guardar_usuario(correo, contraseña_cifrada, token_verificacion):
     cursor = conexion.cursor()
     query = 'insert into usuarios(correo, contraseña, username, token_verificacion, verificado) values(%s, %s, %s, %s, %s)'
@@ -30,10 +37,10 @@ def enviar_correo_verificacion(correo, token_verificacion):
     mensaje["From"] = 'eduardo.pruebaserver@gmail.com'
     mensaje["To"] = correo
 
-    servidor = smtplib.SMTP('smpt.gamil.com', 587)
+    servidor = smtplib.SMTP('smtp.gmail.com', 587)
     servidor.starttls()
-    servidor.login("eduardo.pruebaserver@gmail.com", "pruebasServer")
-    servidor.sendmail("eduardo.pruebaserver@gmail.com", correo, mensaje.as_string())
+    servidor.login("eduardo.pruebasserver@gmail.com", "usax vjqs aclj agrw")
+    servidor.sendmail("eduardo.pruebasserver@gmail.com", correo, mensaje.as_string())
     servidor.quit()
 
 # Registro de usuario
@@ -53,7 +60,7 @@ def verificar_usuario(correo, token):
     cursor.execute(query, (correo,))
     resultado = cursor.fetchone()
     if resultado and resultado[0] == token:
-        query_update = "update usuarios set verificado where correo = %s"
+        query_update = "update usuarios set verificado = %s where correo = %s"
         cursor.execute(query_update, (True, correo))
         conexion.commit()
         return True
@@ -69,4 +76,21 @@ else:
     print("Codigo de verificacion incorrecto.")
 
 
+def iniciar_sesion(correo, contraseña):
+    cursor = conexion.cursor()
+    query = "select id, contraseña from usuarios where correo = %s and verificado = %s"
+    cursor.execute(query, (correo, True))
+    resultado = cursor.fetchone()
+    if resultado and bcrypt.checkpw(contraseña.encode('utf-8'), resultado[1].encode('utf-8')):
+        return resultado[0]
+    return None
 
+# Proceso de inicio de sesion
+correo = input("Introduce tu correo electronico: ")
+contraseña = input("Introduce tu contraseña: ")
+
+usuario_id = iniciar_sesion(correo, contraseña)
+if usuario_id:
+    print("Inicio de sesion exitoso.")
+else:
+    print("Correo o contraseña incorrectos o cuenta no verificada.")
