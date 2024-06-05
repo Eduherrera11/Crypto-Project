@@ -6,7 +6,8 @@ import smtplib
 from email.mime.text import MIMEText
 import requests
 from datetime import datetime
-
+import prettytable as tb
+from urllib.parse import quote
 
 # Conexion a la base de datos
 conexion = mysql.connector.connect(
@@ -36,7 +37,26 @@ def guardar_usuario(correo, contraseña_cifrada, token_verificacion):
     cursor.execute(query, (correo, contraseña_cifrada, correo.split('@')[0], token_verificacion, False))
     conexion.commit()
 
+def verificar_usuario(correo, token):
+                cursor = conexion.cursor()
+                query = "select token_verificacion from usuarios where correo = %s"
+                cursor.execute(query, (correo,))
+                resultado = cursor.fetchone()
+                if resultado and resultado[0] == token:
+                    query_update = "update usuarios set verificado = %s where correo = %s"
+                    cursor.execute(query_update, (True, correo))
+                    conexion.commit()
+                    return True
+                return False
+
 def enviar_correo_verificacion(correo, token_verificacion):
+     # Actualizar el token en la base de datos
+    cursor = conexion.cursor()
+    query = "update usuarios set token_verificacion = %s where correo = %s"
+    cursor.execute(query,(token_verificacion, correo))
+    conexion.commit()
+    cursor.close
+
     mensaje = MIMEText(f"Por favor verifica tu correo usando este codigo: {token_verificacion}")
     mensaje["Subject"] = 'Verificacion de Correo'
     mensaje["From"] = 'eduardo.pruebaserver@gmail.com'
@@ -58,16 +78,33 @@ def iniciar_sesion(correo, contraseña):
     return None
 
 # Analisis de datos Crypto
+def obtener_precios_criptomonedas(nombres):
+    nombres_codificados = [quote(nombre) for nombre in nombres]
+    ids = ",".join(nombres_codificados)
+    url = f"https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies=usd"
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"Error al obtener precios de las criptomonedas: {response.status_code} - {response.text}")
+        return None
+    
 def obtener_precio_criptomoneda(nombre):
-    url = f"https://api.coingecko.com/api/v3/simple/price?ids={nombre}&vs_currencies=usd"
+    nombre_codificado = quote(nombre)
+    url = f"https://api.coingecko.com/api/v3/simple/price?ids={nombre_codificado}&vs_currencies=usd"
     response = requests.get(url)
     if response.status_code == 200:
         datos = response.json()
-        return datos[nombre]["usd"]
+        if nombre_codificado in datos:
+            return datos[nombre_codificado]["usd"]
+        else:
+            print(f"No se encontraron datos para la criptomoneda: {nombre}")
+            return None
     else:
-        print(f"Error al obtener precio de la criptomoneda: ", response.json())
+        print(f"Error al obtener precio de la criptomoneda: {response.status_code} - {response.text}")
         return None
 
+    
 # Funcion para registrar una compra    
 def registrar_compra(usuario_id, criptomoneda, cantidad):
     precio_compra = obtener_precio_criptomoneda(criptomoneda)
@@ -95,29 +132,130 @@ def registrar_compra_manual(usuario_id, criptomoneda, cantidad, precio_compra):
 
 
 def actualizar_valor():
+    try:
+        conexion = mysql.connector.connect(
+            user="root",
+            host="localhost",
+            password="Eduherrera11",
+            database="proyecto_crypto"
+        )
+        cursor = conexion.cursor()
+
+        query = "SELECT id, criptomoneda, cantidad FROM inversiones"
+        cursor.execute(query)
+        inversiones = cursor.fetchall()
+
+        criptomonedas = set(inversion[1] for inversion in inversiones)
+        precios = obtener_precios_criptomonedas(list(criptomonedas))
+        
+        # Diccionario para almacenar precios ya obtenidos
+        precios_cache = {}
+
+        if precios:
+            for inversion in inversiones:
+                id, criptomoneda, cantidad = inversion
+
+                # Verificar si ya se ha obtenido el precio de esta criptomoneda
+                if criptomoneda in precios_cache:
+                    precio_actual = precios_cache[criptomoneda]
+                else:
+                    precio_actual = precios.get(quote(criptomoneda), {}).get("usd")
+                    if precio_actual is not None:
+                        precios_cache[criptomoneda] = precio_actual
+
+                if precio_actual is not None:
+                    query_update = "UPDATE inversiones SET precio_actual = %s WHERE id = %s"
+                    cursor.execute(query_update, (precio_actual, id))
+                    conexion.commit()
+
+        cursor.close()
+        conexion.close()
+
+    except mysql.connector.Error as err:
+        print(f"Error: {err}")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+
+
+def mostrar_historial(id):
     cursor = conexion.cursor()
-    query = "select id, criptomoneda, cantidad, from inversiones"
-    cursor.execute(query)
+    query = "select id, criptomoneda, cantidad, precio_actual, precio_compra, fecha from inversiones where usuario_id = %s"
+    cursor.execute(query, (id,))
     inversiones = cursor.fetchall()
 
-    for inversion in inversiones:
-        id, criptomoneda, cantidad = inversion
-        precio_actual = obtener_precio_criptomoneda(criptomoneda)
-        if precio_actual is not None:
-            query_update = "update inversiones set precio_actual = %s where id = %s"
-            cursor.execute(query_update, (precio_actual, id))
-            conexion.commit()
-
-def mostrar_billetera(id):
+    if inversiones:
+        tabla = tb.PrettyTable()
+        tabla.field_names = ["Id", "Criptomoneda", "Cantidad", "Precio Actual","Precio compra","Fecha"]
+        for inversion in inversiones:
+            tabla.add_row(inversion)
+        print(tabla)
+    else:
+        print("No se encontraron inversiones para este usuario.")
+    
+def ver_billetera(id):
     cursor = conexion.cursor()
-    query = "select * from inversiones where usuario_id = %s"
+    query = """select criptomoneda, sum(cantidad) as cantidad, (sum(precio_actual)/(count(precio_actual))) as precio_actual, 
+    ((sum(cantidad))*(sum(precio_actual)/(count(precio_actual)))) as liquidez,
+    ((SUM(cantidad) * precio_actual) - SUM(cantidad * precio_compra)) / SUM(cantidad * precio_compra) * 100 AS ganancia_perdida_porcentaje
+    from inversiones where usuario_id = %s group by criptomoneda, precio_actual"""
     cursor.execute(query, (id,))
-    return cursor.fetchone()
+    inversiones = cursor.fetchall()
+
+    if inversiones:
+        tabla = tb.PrettyTable()
+        tabla.field_names = ["Criptomoneda", "Cantidad", "Precio Actual","Liquidez","Redimiento (%)"]
+        for inversion in inversiones:
+            tabla.add_row(inversion)
+        print(tabla)
+    else:
+        print("No se encontraron inversiones para este usuario.")
+
+def ver_liquidez(id):
+    cursor = conexion.cursor()
+    query = """select sum(cantidad*precio_actual) as liquidez from inversiones where usuario_id = %s;"""
+    cursor.execute(query, (id,))
+    inversiones = cursor.fetchall()
+
+    if inversiones:
+        tabla = tb.PrettyTable()
+        tabla.field_names = ["Liquidez"]
+        for inversion in inversiones:
+            tabla.add_row(inversion)
+        print(tabla)
+    else:
+        print("No se encontraron inversiones para este usuario.")
+
+def obtener_cripto_billetera(id, criptomoneda):
+    cursor = conexion.cursor()
+    query = """SELECT 
+                    criptomoneda,
+                    SUM(cantidad) AS cantidad_total,
+                    AVG(precio_actual) AS precio_actual,
+                    SUM(cantidad) * AVG(precio_actual) AS liquidez,
+                    ((SUM(cantidad) * AVG(precio_actual)) - SUM(cantidad * precio_compra)) / SUM(cantidad * precio_compra) * 100 AS ganancia_perdida_porcentaje
+                FROM 
+                    inversiones
+                WHERE 
+                    usuario_id = %s AND criptomoneda = %s
+                GROUP BY 
+                    criptomoneda;"""
+    cursor.execute(query, (id, criptomoneda))
+    inversiones = cursor.fetchall()
+
+    if inversiones:
+        tabla = tb.PrettyTable()
+        tabla.field_names = ["Criptomoneda", "Cantidad", "Precio Actual","Liquidez","Redimiento (%)"]
+        for inversion in inversiones:
+            tabla.add_row(inversion)
+        print(tabla)
+    else:
+        print("No se encontraron inversiones para este usuario.")
+
 
 def menu_cripto(correo):
     while True:
 
-        menu = str(input("1. Obtener precio de una criptomoneda\n2. Comprar Cripto\n3. Ver billetera\n4. Salir\n->  "))
+        menu = str(input("1. Obtener precio de una criptomoneda\n2. Comprar Cripto\n3. Ver billetera\n4. Ver historial de compra\n5. Liquidez total\n6. Ver Criptomoneda en billetera\n7. Salir\n->  "))
 
         if menu.title() in ["1", "Obtener", "Obtener precio de una criptomoneda"]:
             criptomoneda = str(input("Selecciona el nombre de la criptomoneda que deseas observar: "))
@@ -150,7 +288,7 @@ def menu_cripto(correo):
                     id = resultado[0]
                     registrar_compra_manual(id, criptomoneda, cantidad, precio)
                 
-                elif menu.title() in ["3", "S", "Salir"]:
+                elif opcion.title() in ["3", "S", "Salir"]:
                     print("Regresando...")
                     break
 
@@ -163,15 +301,42 @@ def menu_cripto(correo):
             cursor.execute(query, (correo,))
             resultado = cursor.fetchone()
             id = resultado[0]
-            billetera = mostrar_billetera(id)
-            if billetera:
-                print("Obteniendo resultados...")
-                print(billetera)
-            else:
-                print("Ha ocurrido un error")
+            actualizar_valor()
+            print("Obteniendo resultados...")
+            ver_billetera(id)            
 
-        
-        elif menu.title() in ["4", "S", "Salir"]:
+        elif menu.title() in ["4", "Ver", "Ver Historial De Compra"]:
+            cursor = conexion.cursor()
+            query = "select id from usuarios where correo like %s"
+            cursor.execute(query, (correo,))
+            resultado = cursor.fetchone()
+            id = resultado[0]
+            actualizar_valor()
+            print("Obteniendo resultados...")
+            mostrar_historial(id)
+
+        elif menu.title() in ["5", "Liquidez"]:
+            cursor = conexion.cursor()
+            query = "select id from usuarios where correo like %s"
+            cursor.execute(query, (correo,))
+            resultado = cursor.fetchone()
+            id = resultado[0]
+            actualizar_valor()
+            print("Obteniendo resultados...") 
+            ver_liquidez(id)
+
+        elif menu.title() in ["6", "Ver Criptomoneda En Billetera"]:
+            cursor = conexion.cursor()
+            query = "select id from usuarios where correo like %s"
+            cursor.execute(query, (correo,))
+            resultado = cursor.fetchone()
+            id = resultado[0]
+            criptomoneda = str(input("Selecciona la cripto que deseas ver en tu billetera: "))
+            actualizar_valor()
+            print("Obteniendo resultados...")
+            obtener_cripto_billetera(id, criptomoneda)
+
+        elif menu.title() in ["7", "S", "Salir"]:
             print("Saliendo del programa")
             break
 
@@ -195,7 +360,31 @@ def menu_inicio_sesion():
                 menu_cripto(correo)
             else:
                 print("Correo o contraseña incorrectos o cuenta no verificada.")
-        
+                verificar = str(input("Deseas reestablecer tu contraseña? Si/No\n:"))
+                if verificar.title() in ["N", "No"]:
+                    break
+                elif verificar.title() in ["S", "Si"]:
+                    email = str(input("Ingresa tu correo: "))
+                    cursor = conexion.cursor()
+                    query = "select correo from usuarios"
+                    cursor.execute(query)
+                    resultado = cursor.fetchall()
+                    resultados = list(i[0] for i in resultado)
+                    if email in resultados:
+                        token_verificacion = generar_token()
+                        enviar_correo_verificacion(email, token_verificacion)
+                        print("Te hemos enviado un correo electronico con un token de verificacion.")
+
+                        # Proceso de verificacion
+                        token = input("Inroduce el codigo de verificacion que recibiste: ")
+
+                        if verificar_usuario(correo, token):
+                            print("Tu cuenta ha sido verificada con exito.")
+                        else:
+                            print("Codigo de verificacion incorrecto.")
+                    else:
+                        print("El correo que ingresaste no esta en la base de datos. Registrate")
+
         elif usuario.title() in ["2", "Registrar", "Registrase"]:
             # Registro de usuario
             correo = input("Introduce tu correo electronico: ")
@@ -207,18 +396,6 @@ def menu_inicio_sesion():
             enviar_correo_verificacion(correo, token_verificacion)
 
             print("Te hemos enviado un correo electronico con un token de verificacion.")
-
-            def verificar_usuario(correo, token):
-                cursor = conexion.cursor()
-                query = "select token_verificacion from usuarios where correo = %s"
-                cursor.execute(query, (correo,))
-                resultado = cursor.fetchone()
-                if resultado and resultado[0] == token:
-                    query_update = "update usuarios set verificado = %s where correo = %s"
-                    cursor.execute(query_update, (True, correo))
-                    conexion.commit()
-                    return True
-                return False
 
             # Proceso de verificacion
             correo = input("Introduce tu correo electronico para verificar: ")
