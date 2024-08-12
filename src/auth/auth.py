@@ -1,6 +1,6 @@
 import uuid
 import bcrypt
-from db import DBConnection
+from Cryptos.scripts.db import DBConnection
 
 # Generando codigo
 def generar_token():

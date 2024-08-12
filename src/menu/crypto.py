@@ -3,9 +3,48 @@ from datetime import datetime
 import prettytable as tb
 from urllib.parse import quote
 import os 
-from db import DBConnection, DBConnection2
-from email_utils import enviar_correo
+from Cryptos.scripts.db import DBConnection, DBConnection2
+from Cryptos.src.email.email_utils import enviar_correo
 import time
+import json
+
+def obtener_top_criptomonedas(limit=500):
+    url = f"https://api.coingecko.com/api/v3/coins/markets"
+    params = {
+        'vs_currency': 'usd',
+        'order': 'market_cap_desc',
+        'per_page': limit,
+        'page': 1,
+        'sparkline': 'false'
+    }
+    response = requests.get(url, params=params)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"Error al obtener la lista de criptomonedas: {response.status_code} - {response.text}")
+        return None
+
+
+def guardar_top_criptomonedas_en_json(limit=500, filename="top_criptomonedas.json"):
+    criptomonedas = obtener_top_criptomonedas(limit)
+    if criptomonedas:
+        criptomonedas_json = []
+        for cripto in criptomonedas:
+            criptomoneda_info = {
+                "id": cripto["id"],
+                "name": cripto['name'],
+                "symbol": cripto['symbol'],
+                "current_price": cripto['current_price'],
+                "market_cap_rank": cripto['market_cap_rank']
+            }
+            criptomonedas_json.append(criptomoneda_info)
+        
+        with open(filename, 'w') as archivo_json:
+            json.dump(criptomonedas_json, archivo_json, indent=4)
+        
+        print(f"Se ha guardado la lista de las primeras {limit} criptomonedas en el archivo '{filename}'.")
+    else:
+        print("No se pudo obtener la lista de criptomonedas.")
 
 # Conexion a la api de CoinGecko
 # Lista de criptomonedas 

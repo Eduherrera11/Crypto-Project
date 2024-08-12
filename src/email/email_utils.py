@@ -2,7 +2,7 @@ import smtplib
 from email.mime.text import MIMEText
 from dotenv import load_dotenv
 import os
-from db import DBConnection
+from Cryptos.scripts.db import DBConnection
 
 # Cargar las variables de entorno desde el archivo .env
 load_dotenv()

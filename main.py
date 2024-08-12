@@ -1,8 +1,13 @@
+# Agrega la ruta raíz del proyecto al sys.path
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 # Importaciones necesarias para el funcionamiento del programa
-from auth import iniciar_sesion, usuario_existe, guardar_usuario, verificar_usuario, verificar_usuario_recuperacion_contraseña, cifrar_contraseña, generar_token, actualizar_contraseña
-from email_utils import enviar_correo, enviar_correo_restauracion, enviar_correo_verificacion
-from crypto import obtener_cripto_billetera, crear_stop_profit, comprobar_precios, obtener_precio_criptomoneda, obtener_precios_criptomonedas, obtener_rendimiento, registrar_compra, registrar_compra_manual, actualizar_valor, mostrar_historial, ver_billetera, ver_liquidez, calcular_precio_deseado, comprobar_precios_continuamente
-from db import DBConnection
+from Cryptos.src.auth.auth import iniciar_sesion, usuario_existe, guardar_usuario, verificar_usuario, verificar_usuario_recuperacion_contraseña, cifrar_contraseña, generar_token, actualizar_contraseña
+from Cryptos.src.email.email_utils import enviar_correo, enviar_correo_restauracion, enviar_correo_verificacion
+from Cryptos.src.menu.crypto import guardar_top_criptomonedas_en_json, obtener_top_criptomonedas, obtener_cripto_billetera, crear_stop_profit, comprobar_precios, obtener_precio_criptomoneda, obtener_precios_criptomonedas, obtener_rendimiento, registrar_compra, registrar_compra_manual, actualizar_valor, mostrar_historial, ver_billetera, ver_liquidez, calcular_precio_deseado, comprobar_precios_continuamente
+from Cryptos.scripts.db import DBConnection
 import time
 import schedule
 
@@ -92,6 +97,7 @@ def menu_cripto(correo):
 
         if menu.title() in ["1", "Obtener", "Obtener precio de una criptomoneda"]:
             # Obtener el precio de una criptomoneda especifica
+            # Si la cripto que ingresaste no puede ser encontrada, busca su id en el directorio top_criptomonedas.json
             criptomoneda = str(input("Selecciona el nombre de la criptomoneda que deseas observar: "))
             valor = obtener_precio_criptomoneda(criptomoneda)
             if valor:
@@ -237,6 +243,10 @@ def menu_cripto(correo):
         elif menu.title() in ["12", "S", "Salir"]:
             print("Saliendo del programa")
             break
+
+        elif menu.title() in ["13"]:
+            guardar_top_criptomonedas_en_json()
+            
 
         else:
             print("Selecione una opcion valida!")
